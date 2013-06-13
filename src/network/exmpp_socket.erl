@@ -24,7 +24,7 @@
 -module(exmpp_socket).
 
 -export([connect/3, send/2, close/2, reset_parser/1, get_property/2,
-        compress/1, starttls/2, wping/1
+        compress/1, starttls/2, starttls/3, wping/1
     ]).
 
 %% Internal export
@@ -98,7 +98,12 @@ compress(ReceiverPid) ->
 %% Mode -> client | server
 starttls(ReceiverPid, Mode) ->
     Ref = erlang:make_ref(),
-    ReceiverPid ! {starttls, self(), Ref, Mode},
+    starttls(ReceiverPid, Mode, []).
+
+%% Mode -> client | server
+starttls(ReceiverPid, Mode, Options) ->
+    Ref = erlang:make_ref(),
+    ReceiverPid ! {starttls, self(), Ref, Mode, Options},
     receive
         {ok, Ref, Socket} -> {ok, Socket}
     after
@@ -122,9 +127,11 @@ receiver_loop(ClientPid, ESocket, StreamRef) ->
             ZSocket = {exmpp_compress, exmpp_compress:enable_compression(ESocket, [])},
             From ! {ok, Ref, ZSocket},
 	    receiver_loop(ClientPid, ZSocket, StreamRef);
-	{starttls, From, Ref, Mode} -> 
+	    {starttls, From, Ref, Mode, Options} ->
             exmpp_internals:gen_setopts(ESocket, [{active, false}]),
-            TSocket = {exmpp_tls, exmpp_tls:handshake(Mode, ESocket, undefined, false, [])},
+            Identity         = proplists:get_value(identity, Options),
+            PeerCertVerify   = proplists:get_value(verify_peer, Options, false),
+            TSocket = {exmpp_tls, exmpp_tls:handshake(Mode, ESocket, Identity, PeerCertVerify, Options)},
             From ! {ok, Ref, TSocket},
 	    receiver_loop(ClientPid, TSocket, StreamRef);
         {tcp, Socket, Data} ->

@@ -510,7 +510,7 @@ setup({set_auth_method, Method}, _From, State) ->
 setup({connect_socket, Host, Port, Options}, From, State) ->
     Compress = proplists:get_value(compression, Options, enabled),
     StartTLS = proplists:get_value(starttls, Options, enabled),
-    SessionOptions = [{compression, Compress}, {starttls, StartTLS}],
+    SessionOptions = [{compression, Compress}, {starttls, StartTLS} | Options],
     WhitespacePingT = case proplists:get_value(whitespace_ping, Options, infinity) of
 	    		infinity -> infinity;
 			Sec -> Sec * 1000
@@ -678,7 +678,7 @@ wait_for_starttls_result(#xmlstreamelement{element=#xmlel{name='proceed'}}, Stat
            receiver_ref = ReceiverRef
            %%auth_info = Auth
            } = State,
-    case Module:starttls(ReceiverRef, client) of
+    case Module:starttls(ReceiverRef, client, State#state.options) of
         {ok, NewSocket} ->
             %%Domain = get_domain(Auth),
             Module:reset_parser(ReceiverRef),
